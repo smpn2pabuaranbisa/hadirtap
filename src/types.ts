@@ -107,7 +107,7 @@ export type SyncOperation =
   | {
       action: 'syncSettings';
       policy: AttendancePolicy;
-      schoolProfile: SchoolIdentityTextOnly;
+      schoolProfile: SchoolPrintProfile;
     }
   | {
       action: 'pushAll';
@@ -115,6 +115,6 @@ export type SyncOperation =
       attendance: TeacherAttendanceRecord[];
       weeklySchedule: DaySchedule[];
       policy: AttendancePolicy;
-      schoolProfile: SchoolIdentityTextOnly;
+      schoolProfile: SchoolPrintProfile;
     };
 

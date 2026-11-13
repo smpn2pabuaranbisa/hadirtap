@@ -882,7 +882,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </pre>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Catatan: Data teks identitas sekolah, daftar guru, jadwal Senin–Sabtu, dan log absensi tersinkron ke Google Sheets. Gambar Logo &amp; Tanda Tangan tetap disimpan di perangkat agar tidak melebihi batas 50.000 karakter per sel di Google Sheets.
+              Catatan: Identitas sekolah, logo sekolah, gambar tanda tangan, daftar guru, jadwal Senin–Sabtu, dan log absensi tersinkron otomatis ke Google Sheets (gambar dikompresi otomatis agar tetap muat di sel Google Sheets dan tampil di semua browser).
             </p>
           </section>
         </>

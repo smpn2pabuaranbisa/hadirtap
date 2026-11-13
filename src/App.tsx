@@ -39,7 +39,7 @@ import {
 } from './data/seedData';
 import { soundEngine } from './utils/sound';
 import {
-  stripImageFields,
+  prepareSchoolProfileForSheets,
   sendSyncOperation,
   pullAllFromSheets,
 } from './utils/googleSheetsSync';
@@ -321,39 +321,68 @@ export default function App() {
     };
   }, [pendingQueue]);
 
-  const handlePullFromSheets = useCallback(async (): Promise<{
-    ok: boolean;
-    message: string;
-  }> => {
-    const cfg = sheetsConfigRef.current;
-    const res = await pullAllFromSheets(cfg);
-    if (!res.ok || !res.data) {
-      return { ok: false, message: res.message };
-    }
+  const handlePullFromSheets = useCallback(
+    async (
+      isManualPull = false
+    ): Promise<{
+      ok: boolean;
+      message: string;
+    }> => {
+      const cfg = sheetsConfigRef.current;
+      const res = await pullAllFromSheets(cfg);
+      if (!res.ok || !res.data) {
+        return { ok: false, message: res.message };
+      }
 
-    const { data } = res;
-    if (data.teachers && data.teachers.length > 0) {
-      setTeachers(data.teachers);
-    }
-    if (data.attendance) {
-      setAttendance(data.attendance);
-    }
-    if (data.weeklySchedule && data.weeklySchedule.length > 0) {
-      setWeeklySchedule(data.weeklySchedule);
-    }
-    if (data.policy) {
-      setAttendancePolicy((prev) => ({ ...prev, ...data.policy }));
-    }
-    if (data.schoolProfile) {
-      setSchoolProfile((prev) => ({ ...prev, ...data.schoolProfile }));
-    }
+      const { data } = res;
+      const cleanedTeachers = (data.teachers || []).filter(
+        (t) =>
+          t.id.trim() !== '' ||
+          t.name.trim() !== '' ||
+          t.rfidUid.trim() !== ''
+      );
+      const cleanedAttendance = (data.attendance || []).filter(
+        (a) =>
+          a.id.trim() !== '' ||
+          a.teacherName.trim() !== '' ||
+          a.date.trim() !== ''
+      );
 
-    setSheetsConfig((prev) => ({
-      ...prev,
-      lastSyncedAt: new Date().toLocaleTimeString('id-ID'),
-    }));
-    return { ok: true, message: res.message };
-  }, []);
+      const hasAnySheetContent =
+        cleanedTeachers.length > 0 ||
+        cleanedAttendance.length > 0 ||
+        Boolean(data.weeklySchedule && data.weeklySchedule.length > 0) ||
+        Boolean(data.policy) ||
+        Boolean(data.schoolProfile);
+
+      if (isManualPull || hasAnySheetContent) {
+        setTeachers(cleanedTeachers);
+        setAttendance(cleanedAttendance);
+        if (cleanedAttendance.length === 0) {
+          setLastScan(null);
+        }
+      }
+
+      if (data.weeklySchedule && data.weeklySchedule.length > 0) {
+        setWeeklySchedule(data.weeklySchedule);
+      }
+      if (data.policy) {
+        isApplyingRemoteSyncRef.current = true;
+        setAttendancePolicy((prev) => ({ ...prev, ...data.policy }));
+      }
+      if (data.schoolProfile) {
+        isApplyingRemoteSyncRef.current = true;
+        setSchoolProfile((prev) => ({ ...prev, ...data.schoolProfile }));
+      }
+
+      setSheetsConfig((prev) => ({
+        ...prev,
+        lastSyncedAt: new Date().toLocaleTimeString('id-ID'),
+      }));
+      return { ok: true, message: res.message };
+    },
+    []
+  );
 
   const handlePushAllToSheets = useCallback(async (): Promise<{
     ok: boolean;
@@ -363,13 +392,14 @@ export default function App() {
     if (!cfg.webAppUrl.trim()) {
       return { ok: false, message: 'URL Web App Google Apps Script belum diisi.' };
     }
+    const preparedProfile = await prepareSchoolProfileForSheets(schoolProfile);
     const res = await sendSyncOperation(cfg, {
       action: 'pushAll',
       teachers,
       attendance,
       weeklySchedule,
       policy: attendancePolicy,
-      schoolProfile: stripImageFields(schoolProfile),
+      schoolProfile: preparedProfile,
     });
 
     if (res.ok) {
@@ -388,7 +418,7 @@ export default function App() {
     if (didInitialPullRef.current) return;
     didInitialPullRef.current = true;
     if (sheetsConfig.enabled && sheetsConfig.autoSync && sheetsConfig.webAppUrl.trim()) {
-      void handlePullFromSheets();
+      void handlePullFromSheets(false);
     }
   }, [sheetsConfig.enabled, sheetsConfig.autoSync, sheetsConfig.webAppUrl, handlePullFromSheets]);
 
@@ -398,7 +428,7 @@ export default function App() {
     }
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible' && pendingQueue.length === 0) {
-        void handlePullFromSheets();
+        void handlePullFromSheets(false);
       }
     }, 45000);
     return () => clearInterval(interval);
@@ -420,11 +450,16 @@ export default function App() {
     return () => window.removeEventListener('online', onOnline);
   }, [pendingQueue.length, handleFlushSyncQueue]);
 
-  // Debounced sync for policy & school text identity edits
+  // Debounced sync for policy, school identity, logo, & signature edits
   const didMountSettingsSyncRef = useRef(false);
+  const isApplyingRemoteSyncRef = useRef(false);
   useEffect(() => {
     if (!didMountSettingsSyncRef.current) {
       didMountSettingsSyncRef.current = true;
+      return;
+    }
+    if (isApplyingRemoteSyncRef.current) {
+      isApplyingRemoteSyncRef.current = false;
       return;
     }
     if (
@@ -435,11 +470,14 @@ export default function App() {
       return;
     }
     const timer = setTimeout(() => {
-      void enqueueOrSync({
-        action: 'syncSettings',
-        policy: attendancePolicy,
-        schoolProfile: stripImageFields(schoolProfile),
-      });
+      void (async () => {
+        const preparedProfile = await prepareSchoolProfileForSheets(schoolProfile);
+        await enqueueOrSync({
+          action: 'syncSettings',
+          policy: attendancePolicy,
+          schoolProfile: preparedProfile,
+        });
+      })();
     }, 1500);
     return () => clearTimeout(timer);
   }, [
@@ -452,6 +490,9 @@ export default function App() {
     schoolProfile.principalNip,
     schoolProfile.operatorName,
     schoolProfile.operatorRole,
+    schoolProfile.logoDataUrl,
+    schoolProfile.principalSignatureDataUrl,
+    schoolProfile.operatorSignatureDataUrl,
     sheetsConfig.enabled,
     sheetsConfig.autoSync,
     sheetsConfig.webAppUrl,
@@ -1304,7 +1345,7 @@ export default function App() {
               setSheetsConfig={setSheetsConfig}
               pendingQueueCount={pendingQueue.length}
               onPushAllToSheets={handlePushAllToSheets}
-              onPullFromSheets={handlePullFromSheets}
+              onPullFromSheets={() => handlePullFromSheets(true)}
               onFlushSyncQueue={handleFlushSyncQueue}
             />
           )}

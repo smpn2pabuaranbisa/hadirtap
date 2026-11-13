@@ -9,12 +9,14 @@ import {
   SyncOperation,
 } from '../types';
 
+import { fitImageForSheets } from './imageUpload';
+
 export interface PulledSheetsData {
   teachers?: Teacher[];
   attendance?: TeacherAttendanceRecord[];
   weeklySchedule?: DaySchedule[];
   policy?: AttendancePolicy;
-  schoolProfile?: Partial<SchoolIdentityTextOnly>;
+  schoolProfile?: Partial<SchoolPrintProfile>;
 }
 
 export function stripImageFields(
@@ -32,6 +34,27 @@ export function stripImageFields(
   };
 }
 
+export async function prepareSchoolProfileForSheets(
+  profile: SchoolPrintProfile
+): Promise<SchoolPrintProfile> {
+  const safeLogo = profile.logoDataUrl
+    ? await fitImageForSheets(profile.logoDataUrl, 320).catch(() => '')
+    : '';
+  const safePrincipalSig = profile.principalSignatureDataUrl
+    ? await fitImageForSheets(profile.principalSignatureDataUrl, 360).catch(() => '')
+    : '';
+  const safeOperatorSig = profile.operatorSignatureDataUrl
+    ? await fitImageForSheets(profile.operatorSignatureDataUrl, 360).catch(() => '')
+    : '';
+
+  return {
+    ...stripImageFields(profile),
+    logoDataUrl: safeLogo,
+    principalSignatureDataUrl: safePrincipalSig,
+    operatorSignatureDataUrl: safeOperatorSig,
+  };
+}
+
 export async function testSheetsConnection(
   config: GoogleSheetsConfig
 ): Promise<{ ok: boolean; message: string; spreadsheetName?: string }> {
@@ -43,8 +66,12 @@ export async function testSheetsConnection(
   try {
     const endpoint = `${url}${url.includes('?') ? '&' : '?'}action=ping&token=${encodeURIComponent(
       config.secretToken.trim()
-    )}`;
-    const res = await fetch(endpoint, { method: 'GET', redirect: 'follow' });
+    )}&_ts=${Date.now()}`;
+    const res = await fetch(endpoint, {
+      method: 'GET',
+      redirect: 'follow',
+      cache: 'no-store',
+    });
     if (!res.ok) {
       return {
         ok: false,
@@ -83,8 +110,12 @@ export async function pullAllFromSheets(
   try {
     const endpoint = `${url}${url.includes('?') ? '&' : '?'}action=pullAll&token=${encodeURIComponent(
       config.secretToken.trim()
-    )}`;
-    const res = await fetch(endpoint, { method: 'GET', redirect: 'follow' });
+    )}&_ts=${Date.now()}`;
+    const res = await fetch(endpoint, {
+      method: 'GET',
+      redirect: 'follow',
+      cache: 'no-store',
+    });
     if (!res.ok) {
       return {
         ok: false,
@@ -442,43 +473,39 @@ function pullAllData_(ss) {
   var result = {};
 
   var teacherRows = readBody_(ss.getSheetByName(SHEET_NAMES.TEACHERS));
-  if (teacherRows.length > 0) {
-    result.teachers = teacherRows.map(function (r) {
-      return {
-        id: String(r[0]),
-        nip: String(r[1]),
-        name: String(r[2]),
-        role: String(r[3]),
-        rfidUid: String(r[4]),
-        gender: String(r[5]) === 'P' ? 'P' : 'L',
-        phone: String(r[6]),
-        cardRegisteredAt: String(r[7])
-      };
-    });
-  }
+  result.teachers = teacherRows.map(function (r) {
+    return {
+      id: String(r[0]),
+      nip: String(r[1]),
+      name: String(r[2]),
+      role: String(r[3]),
+      rfidUid: String(r[4]),
+      gender: String(r[5]) === 'P' ? 'P' : 'L',
+      phone: String(r[6]),
+      cardRegisteredAt: String(r[7])
+    };
+  });
 
   var attRows = readBody_(ss.getSheetByName(SHEET_NAMES.ATTENDANCE));
-  if (attRows.length > 0) {
-    result.attendance = attRows.map(function (r) {
-      return {
-        id: String(r[0]),
-        date: formatCellDate_(r[1]),
-        teacherId: String(r[2]),
-        teacherName: String(r[3]),
-        nip: String(r[4]),
-        role: String(r[5]),
-        rfidUid: String(r[6]),
-        checkInTime: formatCellTime_(r[7]),
-        checkOutTime: formatCellTime_(r[8]),
-        status: String(r[9] || 'Hadir'),
-        lateMinutes: Number(r[10] || 0),
-        workDuration: r[11] ? String(r[11]) : null,
-        checkoutStatus: r[12] ? String(r[12]) : null,
-        method: String(r[13]) === 'Input Manual' ? 'Input Manual' : 'RFID Otomatis',
-        notes: r[14] ? String(r[14]) : undefined
-      };
-    });
-  }
+  result.attendance = attRows.map(function (r) {
+    return {
+      id: String(r[0]),
+      date: formatCellDate_(r[1]),
+      teacherId: String(r[2]),
+      teacherName: String(r[3]),
+      nip: String(r[4]),
+      role: String(r[5]),
+      rfidUid: String(r[6]),
+      checkInTime: formatCellTime_(r[7]),
+      checkOutTime: formatCellTime_(r[8]),
+      status: String(r[9] || 'Hadir'),
+      lateMinutes: Number(r[10] || 0),
+      workDuration: r[11] ? String(r[11]) : null,
+      checkoutStatus: r[12] ? String(r[12]) : null,
+      method: String(r[13]) === 'Input Manual' ? 'Input Manual' : 'RFID Otomatis',
+      notes: r[14] ? String(r[14]) : undefined
+    };
+  });
 
   var schedRows = readBody_(ss.getSheetByName(SHEET_NAMES.SCHEDULE));
   if (schedRows.length > 0) {
@@ -524,7 +551,12 @@ function clearBody_(sheet) {
 
 function readBody_(sheet) {
   if (!sheet || sheet.getLastRow() <= 1) return [];
-  return sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  return rows.filter(function (r) {
+    return r.some(function (cell) {
+      return String(cell || '').trim() !== '';
+    });
+  });
 }
 
 function formatCellDate_(val) {
