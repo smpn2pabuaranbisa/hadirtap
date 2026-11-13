@@ -1,0 +1,8 @@
+{
+  "name": "Remix HadirTap — Sistem Absensi RFID Guru \u0026 Kelas",
+  "description": "Aplikasi manajemen kelas dan absensi otomatis berbasis kartu RFID untuk guru, lengkap dengan pemindai USB/WebHID real-time, rekap kehadiran, dan laporan akademik.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
