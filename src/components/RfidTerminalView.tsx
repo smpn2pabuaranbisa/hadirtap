@@ -12,7 +12,6 @@ import {
   LogOut,
   Trash2,
   ShieldAlert,
-  Timer,
   CalendarDays,
   Copy,
   RotateCcw,
@@ -75,7 +74,6 @@ export const RfidTerminalView: React.FC<RfidTerminalViewProps> = ({
   setSelectedDate,
 }) => {
   const [manualUid, setManualUid] = useState('');
-  const [simulatedTimeOverride, setSimulatedTimeOverride] = useState<string>('');
   const [liveClock, setLiveClock] = useState<string>('');
 
   const checkInThreshold = activeDaySchedule.checkInTime;
@@ -109,18 +107,8 @@ export const RfidTerminalView: React.FC<RfidTerminalViewProps> = ({
     e.preventDefault();
     const cleaned = manualUid.trim().toUpperCase();
     if (!cleaned) return;
-    onTriggerScan(cleaned, simulatedTimeOverride || undefined);
+    onTriggerScan(cleaned);
     setManualUid('');
-  };
-
-  const handleSimulateUnregistered = () => {
-    const randomHex = () =>
-      Math.floor(16 + Math.random() * 239)
-        .toString(16)
-        .toUpperCase()
-        .padStart(2, '0');
-    const unknownUid = `04:${randomHex()}:${randomHex()}:FE`;
-    onTriggerScan(unknownUid, simulatedTimeOverride || undefined);
   };
 
   return (
@@ -158,20 +146,11 @@ export const RfidTerminalView: React.FC<RfidTerminalViewProps> = ({
                 </>
               )}
             </button>
-
-            <button
-              type="button"
-              onClick={handleSimulateUnregistered}
-              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
-            >
-              <CreditCard className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span>Simulasi Kartu Baru</span>
-            </button>
           </div>
         </div>
 
         {/* Shift & Mode Configuration */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
               Mode Pembacaan Terminal RFID
@@ -191,7 +170,7 @@ export const RfidTerminalView: React.FC<RfidTerminalViewProps> = ({
 
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-              Tanggal Aktif / Hari Uji
+              Tanggal Aktif
             </label>
             <input
               type="date"
@@ -221,58 +200,6 @@ export const RfidTerminalView: React.FC<RfidTerminalViewProps> = ({
                 </span>
               )}
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-              Simulasi Jam Tap (Untuk Pengujian)
-            </label>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="time"
-                value={simulatedTimeOverride}
-                onChange={(e) => setSimulatedTimeOverride(e.target.value)}
-                className="w-full px-2.5 py-2 text-sm font-mono tabular-nums bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              {simulatedTimeOverride && (
-                <button
-                  type="button"
-                  onClick={() => setSimulatedTimeOverride('')}
-                  className="px-2.5 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Time Preset Buttons for Testing Check-In & Check-Out */}
-        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span className="text-slate-500 dark:text-slate-400">
-            Pintasan Uji Jam Tap:
-          </span>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {[
-              { label: '06:50 (Datang Tepat)', val: '06:50' },
-              { label: '07:25 (Datang Terlambat)', val: '07:25' },
-              { label: '11:45 (Pulang Jumat)', val: '11:45' },
-              { label: '15:15 (Pulang Normal)', val: '15:15' },
-              { label: 'Gunakan Jam Server', val: '' },
-            ].map((preset) => (
-              <button
-                key={preset.label}
-                type="button"
-                onClick={() => setSimulatedTimeOverride(preset.val)}
-                className={`px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap shrink-0 ${
-                  simulatedTimeOverride === preset.val
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
           </div>
         </div>
       </section>
@@ -491,11 +418,9 @@ export const RfidTerminalView: React.FC<RfidTerminalViewProps> = ({
         </div>
       </section>
 
-      {/* Main Split: Hardware RFID Reader Monitor & Teacher Card Deck Simulator */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        {/* Left: RFID Reader Hardware Terminal */}
-        <div className="lg:col-span-5 flex flex-col">
-          <div className="bg-slate-900 text-white border border-slate-800 rounded-xl p-6 flex flex-col justify-between flex-1">
+      {/* Hardware RFID Reader Monitor */}
+      <section className="flex flex-col">
+        <div className="bg-slate-900 text-white border border-slate-800 rounded-xl p-6 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-800">
                 <div className="flex items-center gap-2.5">
@@ -668,143 +593,16 @@ export const RfidTerminalView: React.FC<RfidTerminalViewProps> = ({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-
-        {/* Right: Interactive Teacher RFID Card Simulator */}
-        <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                  Simulator Tap Kartu RFID Guru ({teachers.length} Guru)
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Klik tombol <strong>Tap Datang</strong> atau <strong>Tap Pulang</strong> pada kartu guru di bawah untuk menguji absensi otomatis.
-                </p>
-              </div>
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                Datang: {checkedInCount} · Pulang: {checkedOutCount}
+            <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+              <span>
+                Mendukung semua USB RFID Reader Keyboard Wedge tanpa instalasi driver tambahan.
+              </span>
+              <span className="font-mono tabular-nums">
+                Tanggal: {selectedDate}
               </span>
             </div>
-
-            {teachers.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-500 dark:text-slate-400">
-                Belum ada data guru terdaftar. Tambahkan atau upload massal data guru di menu <strong>Kartu Guru</strong>, atau tarik data dari <strong>Google Spreadsheet</strong>.
-              </div>
-            ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 max-h-[380px] overflow-y-auto pr-1">
-              {teachers.map((teacher) => {
-                const rec = todayRecords.find((r) => r.teacherId === teacher.id);
-                const hasCheckedIn = Boolean(rec?.checkInTime);
-                const hasCheckedOut = Boolean(rec?.checkOutTime);
-
-                return (
-                  <div
-                    key={teacher.id}
-                    className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors flex items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
-                        {teacher.name}
-                      </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                        {teacher.role}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                        <span className="text-indigo-600 dark:text-indigo-400">
-                          {teacher.rfidUid}
-                        </span>
-                        {rec?.checkInTime && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span
-                              className={
-                                rec.status === 'Terlambat'
-                                  ? 'text-amber-600 dark:text-amber-400 font-medium'
-                                  : 'text-emerald-600 dark:text-emerald-400 font-medium'
-                              }
-                            >
-                              Masuk {rec.checkInTime.slice(0, 5)}
-                            </span>
-                          </>
-                        )}
-                        {rec?.checkOutTime && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span className="text-indigo-600 dark:text-indigo-400 font-medium">
-                              Pulang {rec.checkOutTime.slice(0, 5)}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {!hasCheckedIn ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onTriggerScan(
-                              teacher.rfidUid,
-                              simulatedTimeOverride || undefined,
-                              'in'
-                            )
-                          }
-                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-colors whitespace-nowrap shrink-0 inline-flex items-center gap-1.5"
-                        >
-                          <LogIn className="w-3.5 h-3.5" />
-                          <span>Tap Datang</span>
-                        </button>
-                      ) : !hasCheckedOut ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onTriggerScan(
-                              teacher.rfidUid,
-                              simulatedTimeOverride || undefined,
-                              'out'
-                            )
-                          }
-                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors whitespace-nowrap shrink-0 inline-flex items-center gap-1.5"
-                        >
-                          <LogOut className="w-3.5 h-3.5" />
-                          <span>Tap Pulang</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onTriggerScan(
-                              teacher.rfidUid,
-                              simulatedTimeOverride || undefined,
-                              'out'
-                            )
-                          }
-                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0 inline-flex items-center gap-1.5"
-                        >
-                          <Timer className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Update Pulang</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            )}
           </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span>
-              Mendukung semua USB RFID Reader Keyboard Wedge tanpa instalasi driver tambahan.
-            </span>
-            <span className="font-mono tabular-nums">
-              Tanggal: {selectedDate}
-            </span>
-          </div>
-        </div>
-      </div>
+        </section>
 
       {/* Live Daily Teacher Attendance Log Table */}
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">

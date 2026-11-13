@@ -12,9 +12,6 @@ import {
   VolumeX,
   CreditCard,
   CornerDownLeft,
-  ChevronUp,
-  ChevronDown,
-  Timer,
 } from 'lucide-react';
 import {
   Teacher,
@@ -68,8 +65,6 @@ export const KioskModeView: React.FC<KioskModeViewProps> = ({
   const [liveTime, setLiveTime] = useState<string>('');
   const [liveDateLabel, setLiveDateLabel] = useState<string>('');
   const [manualUid, setManualUid] = useState('');
-  const [showSimulatorDrawer, setShowSimulatorDrawer] = useState(true);
-  const [simulatedTimeOverride, setSimulatedTimeOverride] = useState('');
 
   useEffect(() => {
     const updateClock = () => {
@@ -109,7 +104,7 @@ export const KioskModeView: React.FC<KioskModeViewProps> = ({
     e.preventDefault();
     const cleaned = manualUid.trim().toUpperCase();
     if (!cleaned) return;
-    onTriggerScan(cleaned, simulatedTimeOverride || undefined);
+    onTriggerScan(cleaned);
     setManualUid('');
   };
 
@@ -229,9 +224,7 @@ export const KioskModeView: React.FC<KioskModeViewProps> = ({
                   WAKTU SERVER SAAT INI
                 </div>
                 <div className="text-4xl sm:text-5xl font-bold font-mono tabular-nums tracking-tight text-white mt-1">
-                  {simulatedTimeOverride
-                    ? `${simulatedTimeOverride}:00`
-                    : liveTime}{' '}
+                  {liveTime}{' '}
                   <span className="text-lg font-normal text-slate-400">WIB</span>
                 </div>
               </div>
@@ -506,134 +499,6 @@ export const KioskModeView: React.FC<KioskModeViewProps> = ({
               </span>
             </div>
           </div>
-        </div>
-
-        {/* Collapsible Simulator Panel for Testing on Kiosk Screen */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-          <div className="px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Simulator Tap Kartu RFID Guru (Panel Pengujian Kiosk)
-              </span>
-              <div className="hidden sm:flex items-center gap-1.5 text-xs">
-                {[
-                  { label: 'Jam Server', val: '' },
-                  { label: '06:50 (Datang)', val: '06:50' },
-                  { label: '07:20 (Terlambat)', val: '07:20' },
-                  { label: '15:15 (Pulang)', val: '15:15' },
-                ].map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => setSimulatedTimeOverride(p.val)}
-                    className={`px-2 py-1 rounded font-medium transition-colors whitespace-nowrap shrink-0 ${
-                      simulatedTimeOverride === p.val
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowSimulatorDrawer(!showSimulatorDrawer)}
-              className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap shrink-0"
-            >
-              <span>
-                {showSimulatorDrawer
-                  ? 'Sembunyikan Simulator'
-                  : 'Tampilkan Simulator'}
-              </span>
-              {showSimulatorDrawer ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-
-          {showSimulatorDrawer && (
-            teachers.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                Belum ada data guru. Tambahkan guru di menu <strong>Kartu Guru</strong> (atau tarik data dari <strong>Pengaturan &rarr; Database Google Spreadsheet</strong>).
-              </div>
-            ) : (
-            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              {teachers.map((teacher) => {
-                const rec = todayRecords.find((r) => r.teacherId === teacher.id);
-                const hasCheckedIn = Boolean(rec?.checkInTime);
-                const hasCheckedOut = Boolean(rec?.checkOutTime);
-
-                return (
-                  <div
-                    key={teacher.id}
-                    className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 flex flex-col justify-between gap-2.5"
-                  >
-                    <div>
-                      <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
-                        {teacher.name}
-                      </div>
-                      <div className="text-xs font-mono tabular-nums text-indigo-600 dark:text-indigo-400 mt-0.5">
-                        {teacher.rfidUid}
-                      </div>
-                    </div>
-
-                    {!hasCheckedIn ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onTriggerScan(
-                            teacher.rfidUid,
-                            simulatedTimeOverride || undefined,
-                            'in'
-                          )
-                        }
-                        className="w-full py-1.5 px-2.5 text-xs font-semibold rounded-md bg-emerald-600 text-white hover:bg-emerald-500 transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
-                      >
-                        <LogIn className="w-3.5 h-3.5" />
-                        <span>Tap Datang</span>
-                      </button>
-                    ) : !hasCheckedOut ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onTriggerScan(
-                            teacher.rfidUid,
-                            simulatedTimeOverride || undefined,
-                            'out'
-                          )
-                        }
-                        className="w-full py-1.5 px-2.5 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-500 transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        <span>Tap Pulang</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onTriggerScan(
-                            teacher.rfidUid,
-                            simulatedTimeOverride || undefined,
-                            'out'
-                          )
-                        }
-                        className="w-full py-1.5 px-2.5 text-xs font-medium rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
-                      >
-                        <Timer className="w-3.5 h-3.5 text-indigo-500" />
-                        <span>Selesai ({rec?.checkOutTime?.slice(0, 5)})</span>
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            )
-          )}
         </div>
       </div>
     </div>

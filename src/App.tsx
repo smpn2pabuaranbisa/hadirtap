@@ -85,10 +85,19 @@ const DEFAULT_SCHOOL_PROFILE: SchoolPrintProfile = {
   operatorRole: 'Petugas / Operator Absensi',
 };
 
+// URL Web App Google Apps Script tertanam permanen (dapat ditimpa via VITE_SHEETS_WEB_APP_URL di Netlify)
+const EMBEDDED_SHEETS_WEB_APP_URL = (
+  import.meta.env.VITE_SHEETS_WEB_APP_URL ||
+  'https://script.google.com/macros/s/AKfycbzuuq0bqpydL9R8r1-fDL_l4pnXJINed84fcWu_UuUtp3gxK7SjQ4p2V3giaigmKGPu/exec'
+).trim();
+const EMBEDDED_SHEETS_SECRET_TOKEN = (
+  import.meta.env.VITE_SHEETS_SECRET_TOKEN || 'HADIRTAP-2026'
+).trim();
+
 const DEFAULT_SHEETS_CONFIG: GoogleSheetsConfig = {
-  enabled: false,
-  webAppUrl: '',
-  secretToken: 'HADIRTAP-2026',
+  enabled: Boolean(EMBEDDED_SHEETS_WEB_APP_URL),
+  webAppUrl: EMBEDDED_SHEETS_WEB_APP_URL,
+  secretToken: EMBEDDED_SHEETS_SECRET_TOKEN,
   autoSync: true,
 };
 
@@ -152,8 +161,20 @@ export default function App() {
 
   const [sheetsConfig, setSheetsConfig] = useState<GoogleSheetsConfig>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.SHEETS_CONFIG);
-      return saved ? JSON.parse(saved) : DEFAULT_SHEETS_CONFIG;
+      const savedRaw = localStorage.getItem(STORAGE_KEYS.SHEETS_CONFIG);
+      if (savedRaw) {
+        const parsed = JSON.parse(savedRaw) as Partial<GoogleSheetsConfig>;
+        if (!parsed.webAppUrl && EMBEDDED_SHEETS_WEB_APP_URL) {
+          return {
+            enabled: true,
+            webAppUrl: EMBEDDED_SHEETS_WEB_APP_URL,
+            secretToken: parsed.secretToken || EMBEDDED_SHEETS_SECRET_TOKEN,
+            autoSync: parsed.autoSync ?? true,
+          };
+        }
+        return { ...DEFAULT_SHEETS_CONFIG, ...parsed };
+      }
+      return DEFAULT_SHEETS_CONFIG;
     } catch {
       return DEFAULT_SHEETS_CONFIG;
     }
@@ -361,7 +382,7 @@ export default function App() {
     return res;
   }, [teachers, attendance, weeklySchedule, attendancePolicy, schoolProfile]);
 
-  // Auto-pull on startup & flush queue when back online
+  // Auto-pull on startup & periodic background sync across devices
   const didInitialPullRef = useRef(false);
   useEffect(() => {
     if (didInitialPullRef.current) return;
@@ -370,6 +391,24 @@ export default function App() {
       void handlePullFromSheets();
     }
   }, [sheetsConfig.enabled, sheetsConfig.autoSync, sheetsConfig.webAppUrl, handlePullFromSheets]);
+
+  useEffect(() => {
+    if (!sheetsConfig.enabled || !sheetsConfig.autoSync || !sheetsConfig.webAppUrl.trim()) {
+      return;
+    }
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && pendingQueue.length === 0) {
+        void handlePullFromSheets();
+      }
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [
+    sheetsConfig.enabled,
+    sheetsConfig.autoSync,
+    sheetsConfig.webAppUrl,
+    pendingQueue.length,
+    handlePullFromSheets,
+  ]);
 
   useEffect(() => {
     const onOnline = () => {
